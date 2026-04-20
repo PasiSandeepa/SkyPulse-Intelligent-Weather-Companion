@@ -1,4 +1,4 @@
-package com.example.skypulse_app
+package com.skypulse.skypulse
 
 import io.flutter.embedding.android.FlutterActivity
 

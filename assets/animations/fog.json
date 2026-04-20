@@ -1,0 +1,7 @@
+{
+  "name": "foggy",
+  "type": "fog",
+  "frames": 40,
+  "duration": 1.2,
+  "description": "Foggy conditions"
+}

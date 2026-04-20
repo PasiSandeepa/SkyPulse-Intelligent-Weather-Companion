@@ -1,0 +1,7 @@
+{
+  "name": "snowy",
+  "type": "snow",
+  "frames": 60,
+  "duration": 2.0,
+  "description": "Snow falling"
+}

@@ -28,17 +28,17 @@ dependencies:
   # AI & Machine Learning
   google_generative_ai: ^0.4.0
   
-  # Voice Features
-  speech_to_text: ^6.6.0
-  flutter_tts: ^3.8.5
+  # Voice Features (UPDATED VERSIONS)
+  speech_to_text: ^7.0.0  # 6.6.0 සිට 7.0.0 ට
+  flutter_tts: ^4.2.0      # 3.8.5 සිට 4.2.0 ට
   
   # UI
   lottie: ^2.7.0
   fl_chart: ^0.65.0
   
-  # Notifications
-  firebase_messaging: ^14.7.0
-  firebase_core: ^2.24.0
+  # # Notifications (Commented)
+  # firebase_messaging: ^14.7.0
+  # firebase_core: ^2.24.0
   
   # Dependency Injection
   get_it: ^7.6.4
@@ -48,7 +48,7 @@ dependencies:
   
   # Utilities
   intl: ^0.18.0
-  share_plus: ^7.0.0
+  share_plus: ^10.1.4    # 7.0.0 සිට 10.1.4 ට
   path_provider: ^2.1.0
   flutter_dotenv: ^5.1.0
 
