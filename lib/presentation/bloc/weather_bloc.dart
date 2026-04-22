@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'weather_state.dart';
 import 'weather_event.dart';
 import '../../domain/usecases/get_weather_usecase.dart';
@@ -28,7 +29,11 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
     await result.fold(
       (error) async => emit(WeatherError(error)),
       (weather) async {
-        emit(WeatherLoaded(weather: weather));
+        // ✅ cityName එක event එකෙන් ගන්න
+        emit(WeatherLoaded(
+          weather: weather, 
+          cityName: event.cityName,
+        ));
       },
     );
   }
@@ -50,11 +55,18 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
           (error) => forecast = [],
           (data) => forecast = data,
         );
-        emit(WeatherLoaded(weather: weather, forecast: forecast));
+        // ✅ Get city name from coordinates
+        String cityName = await _getCityName(event.lat, event.lon);
+        emit(WeatherLoaded(
+          weather: weather, 
+          forecast: forecast,
+          cityName: cityName,  // ✅ cityName එක add කරන්න
+        ));
       },
     );
   }
   
+  // ✅ Auto-detect current location
   Future<void> _onFetchCurrentLocationWeather(
     FetchCurrentLocationWeather event,
     Emitter<WeatherState> emit,
@@ -79,7 +91,16 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
       }
       
       // Get current position
-      Position position = await Geolocator.getCurrentPosition();
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      
+      print('📍 Coordinates: ${position.latitude}, ${position.longitude}');
+      
+      // ✅ Get city name from coordinates (AUTO-DETECT)
+      String cityName = await _getCityName(position.latitude, position.longitude);
+      print('📍 Auto-detected city: $cityName');
       
       final result = await getWeatherUseCase.execute(
         lat: position.latitude,
@@ -98,11 +119,40 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
             (error) => forecast = [],
             (data) => forecast = data,
           );
-          emit(WeatherLoaded(weather: weather, forecast: forecast));
+          // ✅ Send auto-detected city name with weather
+          emit(WeatherLoaded(
+            weather: weather,
+            forecast: forecast,
+            cityName: cityName,  // ✅ Auto-detected city name!
+          ));
         },
       );
     } catch (e) {
+      print('❌ Auto-detect error: $e');
       emit(WeatherError('Failed to get location: $e'));
+    }
+  }
+  
+  // ✅ Get city name from coordinates
+  Future<String> _getCityName(double lat, double lon) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lon);
+      
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+        
+        String city = place.locality ?? 
+                     place.subAdministrativeArea ?? 
+                     place.administrativeArea ?? 
+                     'Unknown';
+        
+        print('📍 City detected: $city');
+        return city;
+      }
+      return 'Unknown';
+    } catch (e) {
+      print('❌ Error getting city: $e');
+      return 'Unknown';
     }
   }
 }
