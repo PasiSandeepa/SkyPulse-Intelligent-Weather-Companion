@@ -27,7 +27,8 @@ class GetForecastUseCase {
   
   GetForecastUseCase(this.repository);
   
-  Future<Either<String, List<double>>> execute(double lat, double lon) {
+
+  Future<Either<String, List<WeatherEntity>>> execute(double lat, double lon) {
     return repository.getForecast(lat, lon);
   }
 }
