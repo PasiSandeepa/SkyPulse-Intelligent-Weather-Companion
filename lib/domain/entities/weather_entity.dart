@@ -13,7 +13,10 @@ class WeatherEntity extends Equatable {
   final String iconCode;
   final int aqi;
   final double uvIndex;
-  
+  final double visibility;
+  final int sunrise;
+  final int sunset;
+
   const WeatherEntity({
     required this.cityName,
     required this.temp,
@@ -27,12 +30,15 @@ class WeatherEntity extends Equatable {
     required this.iconCode,
     required this.aqi,
     required this.uvIndex,
+    this.visibility = 10.0,
+    this.sunrise = 0,
+    this.sunset = 0,
   });
-  
+
   @override
   List<Object?> get props => [
-    cityName, temp, feelsLike, tempMin, tempMax, 
-    humidity, windSpeed, condition, description, 
-    iconCode, aqi, uvIndex
+    cityName, temp, feelsLike, tempMin, tempMax,
+    humidity, windSpeed, condition, description,
+    iconCode, aqi, uvIndex, visibility, sunrise, sunset,
   ];
 }
