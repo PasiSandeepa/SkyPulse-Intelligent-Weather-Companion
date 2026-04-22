@@ -15,11 +15,16 @@ class WeatherLoading extends WeatherState {}
 class WeatherLoaded extends WeatherState {
   final WeatherEntity weather;
   final List<double> forecast;
+  final String cityName;  // ✅ මෙය add කරන්න
   
-  const WeatherLoaded({required this.weather, this.forecast = const []});
+  const WeatherLoaded({
+    required this.weather, 
+    this.forecast = const [],
+    required this.cityName,  // ✅ required
+  });
   
   @override
-  List<Object?> get props => [weather, forecast];
+  List<Object?> get props => [weather, forecast, cityName];
 }
 
 class WeatherError extends WeatherState {
