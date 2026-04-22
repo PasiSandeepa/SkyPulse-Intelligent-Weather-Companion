@@ -53,7 +53,7 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
         List<double> forecast = [];
         forecastResult.fold(
           (error) => forecast = [],
-          (data) => forecast = data,
+          (data) => forecast = data.map((e) => e.temp).toList(),
         );
         // ✅ Get city name from coordinates
         String cityName = await _getCityName(event.lat, event.lon);
@@ -117,7 +117,7 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
           List<double> forecast = [];
           forecastResult.fold(
             (error) => forecast = [],
-            (data) => forecast = data,
+            (data) => forecast = data.map((e) => e.temp).toList(),
           );
           // ✅ Send auto-detected city name with weather
           emit(WeatherLoaded(
