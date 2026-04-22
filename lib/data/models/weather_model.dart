@@ -13,7 +13,10 @@ class WeatherModel {
   final String iconCode;
   final int aqi;
   final double uvIndex;
-  
+  final double visibility;
+  final int sunrise;
+  final int sunset;
+
   WeatherModel({
     required this.cityName,
     required this.temp,
@@ -27,8 +30,10 @@ class WeatherModel {
     required this.iconCode,
     required this.aqi,
     required this.uvIndex,
+    this.visibility = 10.0,
+    this.sunrise = 0,
+    this.sunset = 0,
   });
-  
 
   factory WeatherModel.fromJson(Map<String, dynamic> json) {
     return WeatherModel(
@@ -42,12 +47,14 @@ class WeatherModel {
       condition: json['weather'][0]['main'],
       description: json['weather'][0]['description'],
       iconCode: json['weather'][0]['icon'],
-      aqi: 50, // Default value, real data separate API එකෙන්
-      uvIndex: 5.0, // Default value
+      visibility: ((json['visibility'] ?? 10000) / 1000).toDouble(),
+      sunrise: json['sys']['sunrise'] as int,
+      sunset: json['sys']['sunset'] as int,
+      aqi: 50,
+      uvIndex: 5.0,
     );
   }
-  
- 
+
   WeatherEntity toEntity() {
     return WeatherEntity(
       cityName: cityName,
@@ -62,10 +69,12 @@ class WeatherModel {
       iconCode: iconCode,
       aqi: aqi,
       uvIndex: uvIndex,
+      visibility: visibility,
+      sunrise: sunrise,
+      sunset: sunset,
     );
   }
-  
-  
+
   WeatherModel updateWith({int? aqi, double? uvIndex}) {
     return WeatherModel(
       cityName: cityName,
@@ -78,6 +87,9 @@ class WeatherModel {
       condition: condition,
       description: description,
       iconCode: iconCode,
+      visibility: visibility,
+      sunrise: sunrise,
+      sunset: sunset,
       aqi: aqi ?? this.aqi,
       uvIndex: uvIndex ?? this.uvIndex,
     );
