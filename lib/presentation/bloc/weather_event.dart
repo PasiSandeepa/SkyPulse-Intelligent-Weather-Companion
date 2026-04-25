@@ -26,4 +26,11 @@ class FetchWeatherByLocation extends WeatherEvent {
   List<Object?> get props => [lat, lon];
 }
 
-class FetchCurrentLocationWeather extends WeatherEvent {}
+class FetchCurrentLocationWeather extends WeatherEvent {
+  final bool silent;
+
+  const FetchCurrentLocationWeather({this.silent = false});
+
+  @override
+  List<Object?> get props => [silent];
+}

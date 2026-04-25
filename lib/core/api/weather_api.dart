@@ -1,94 +1,83 @@
-import 'package:dio/dio.dart';
-import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
-import '../constants/app_constants.dart';
+import 'dart:convert';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 
 class WeatherApi {
-  late final Dio _dio;
-  
-  WeatherApi() {
-    _dio = Dio(BaseOptions(
-      baseUrl: AppConstants.weatherBaseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
-    ));
-    
-   
-    _dio.interceptors.add(DioCacheInterceptor(
-      options: CacheOptions(
-        store: MemCacheStore(),
-        policy: CachePolicy.request,
-        maxStale: const Duration(minutes: AppConstants.cacheMaxAgeMinutes),
-      ),
-    ));
-  }
-  
+  static const String _baseUrl = 'https://api.openweathermap.org/data/2.5';
 
-  Future<Map<String, dynamic>> getWeatherByCity(String cityName) async {
-    try {
-      final response = await _dio.get(
-        '/weather',
-        queryParameters: {
-          'q': cityName,
-          'appid': AppConstants.weatherApiKey,
-          'units': 'metric',
-        },
-      );
-      return response.data;
-    } on DioException catch (e) {
-      throw Exception('Weather API error: ${e.response?.statusCode} - ${e.message}');
+  String get _apiKey {
+    final apiKey = dotenv.env['OPENWEATHER_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('OPENWEATHER_API_KEY is missing in .env');
     }
+    return apiKey;
   }
-  
-  
-  Future<Map<String, dynamic>> getWeatherByLocation(double lat, double lon) async {
-    try {
-      final response = await _dio.get(
-        '/weather',
-        queryParameters: {
-          'lat': lat,
-          'lon': lon,
-          'appid': AppConstants.weatherApiKey,
-          'units': 'metric',
-        },
-      );
-      return response.data;
-    } on DioException catch (e) {
-      throw Exception('Location weather error: ${e.message}');
-    }
-  }
-  
-  
-  Future<Map<String, dynamic>> getForecast(double lat, double lon) async {
-    try {
-      final response = await _dio.get(
-        '/forecast',
-        queryParameters: {
-          'lat': lat,
-          'lon': lon,
-          'appid': AppConstants.weatherApiKey,
-          'units': 'metric',
-        },
-      );
-      return response.data;
-    } on DioException catch (e) {
-      throw Exception('Forecast API error: ${e.message}');
-    }
-  }
-  
 
-  Future<Map<String, dynamic>> getAirQuality(double lat, double lon) async {
-    try {
-      final response = await _dio.get(
-        '/air_pollution',
-        queryParameters: {
-          'lat': lat,
-          'lon': lon,
-          'appid': AppConstants.weatherApiKey,
-        },
-      );
-      return response.data;
-    } on DioException catch (e) {
-      throw Exception('AQI API error: ${e.message}');
+  Future<Map<String, dynamic>> getWeatherByCity(String cityName) {
+    return _getJson(
+      '/weather',
+      {
+        'q': cityName,
+        'appid': _apiKey,
+        'units': 'metric',
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> getWeatherByLocation(double lat, double lon) {
+    return _getJson(
+      '/weather',
+      {
+        'lat': lat.toString(),
+        'lon': lon.toString(),
+        'appid': _apiKey,
+        'units': 'metric',
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> getForecast(double lat, double lon) {
+    return _getJson(
+      '/forecast',
+      {
+        'lat': lat.toString(),
+        'lon': lon.toString(),
+        'appid': _apiKey,
+        'units': 'metric',
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> getAirQuality(double lat, double lon) {
+    return _getJson(
+      '/air_pollution',
+      {
+        'lat': lat.toString(),
+        'lon': lon.toString(),
+        'appid': _apiKey,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _getJson(
+    String path,
+    Map<String, String> queryParameters,
+  ) async {
+    final uri = Uri.parse('$_baseUrl$path').replace(
+      queryParameters: queryParameters,
+    );
+
+    final response = await http.get(uri);
+    final body = jsonDecode(response.body);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return Map<String, dynamic>.from(body as Map);
     }
+
+    final message = body is Map<String, dynamic>
+        ? body['message']?.toString() ?? 'Unknown API error'
+        : 'Unknown API error';
+    throw Exception(message);
   }
 }

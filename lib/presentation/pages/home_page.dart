@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:lottie/lottie.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +17,8 @@ import '../../common/widgets/animated_temperature.dart';
 import '../../common/widgets/particle_background.dart';
 import '../../data/local/favorite_service.dart';
 import '../../core/ai/ai_service.dart';
+import '../../core/services/location_service.dart';
+import '../../domain/entities/weather_entity.dart';
 import '../widgets/voice_assistant_dialog.dart';
 
 class HomePage extends StatefulWidget {
@@ -22,18 +28,180 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+  static const Duration _locationRefreshCooldown = Duration(seconds: 10);
+  static const double _locationRefreshDistanceMeters = 300;
+
   final TextEditingController _searchController = TextEditingController();
   final FavoriteService _favoriteService = FavoriteService();
   final AIService _aiService = AIService();
+  final LocationService _locationService = LocationService();
+  StreamSubscription<Position>? _locationSubscription;
+  StreamSubscription<ServiceStatus>? _locationServiceSubscription;
+  Position? _lastObservedPosition;
+  DateTime? _lastLocationRefreshAt;
   String _aiInsight = '';
   bool _isLoadingAI = false;
   bool _isDarkMode = false;
+  bool _followDeviceLocation = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _favoriteService.init();
+    _listenToLocationServiceChanges();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _fetchCurrentLocationWeather(force: true);
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted && _followDeviceLocation) {
+      _fetchCurrentLocationWeather(silent: true);
+    }
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      unawaited(_stopLocationTracking());
+    }
+  }
+
+  void _fetchCurrentLocationWeather({
+    bool silent = false,
+    bool force = false,
+  }) {
+    unawaited(
+      _syncAndFetchCurrentLocationWeather(
+        silent: silent,
+        force: force,
+      ),
+    );
+  }
+
+  void _searchWeatherByCity(String city) {
+    final trimmedCity = city.trim();
+    if (trimmedCity.isEmpty) {
+      return;
+    }
+
+    _followDeviceLocation = false;
+    context.read<WeatherBloc>().add(FetchWeatherByCity(trimmedCity));
+    _searchController.clear();
+  }
+
+  Future<void> _syncAndFetchCurrentLocationWeather({
+    bool silent = false,
+    bool force = false,
+  }) async {
+    _followDeviceLocation = true;
+    final isTrackingReady = await _ensureLocationTrackingReady();
+    if (!mounted || !isTrackingReady) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final shouldThrottle = !force &&
+        _lastLocationRefreshAt != null &&
+        now.difference(_lastLocationRefreshAt!) < _locationRefreshCooldown;
+
+    if (shouldThrottle) {
+      return;
+    }
+
+    _lastLocationRefreshAt = now;
+    context.read<WeatherBloc>().add(FetchCurrentLocationWeather(silent: silent));
+  }
+
+  Future<bool> _ensureLocationTrackingReady() async {
+    final hasLocationAccess = await _locationService.ensureLocationAccess();
+    if (!hasLocationAccess) {
+      await _stopLocationTracking();
+      return false;
+    }
+
+    if (_locationSubscription == null) {
+      _startLocationTracking();
+    }
+
+    return true;
+  }
+
+  void _listenToLocationServiceChanges() {
+    _locationServiceSubscription?.cancel();
+    _locationServiceSubscription = Geolocator.getServiceStatusStream().listen(
+      (status) {
+        if (!mounted || !_followDeviceLocation) {
+          return;
+        }
+
+        if (status == ServiceStatus.enabled) {
+          _fetchCurrentLocationWeather(silent: true, force: true);
+        } else {
+          unawaited(_stopLocationTracking());
+        }
+      },
+      onError: (_) {
+        _locationServiceSubscription = null;
+      },
+      onDone: () {
+        _locationServiceSubscription = null;
+      },
+    );
+  }
+
+  void _startLocationTracking() {
+    _locationSubscription?.cancel();
+    _locationSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 100,
+      ),
+    ).listen(
+      _handlePositionUpdate,
+      onError: (_) {
+        _locationSubscription = null;
+      },
+      onDone: () {
+        _locationSubscription = null;
+      },
+    );
+  }
+
+  Future<void> _stopLocationTracking() async {
+    await _locationSubscription?.cancel();
+    _locationSubscription = null;
+    _lastObservedPosition = null;
+  }
+
+  void _handlePositionUpdate(Position position) {
+    if (!mounted || !_followDeviceLocation) {
+      _lastObservedPosition = position;
+      return;
+    }
+
+    final previousPosition = _lastObservedPosition;
+    _lastObservedPosition = position;
+
+    if (previousPosition == null) {
+      _fetchCurrentLocationWeather(silent: true);
+      return;
+    }
+
+    final movedDistance = Geolocator.distanceBetween(
+      previousPosition.latitude,
+      previousPosition.longitude,
+      position.latitude,
+      position.longitude,
+    );
+
+    if (movedDistance >= _locationRefreshDistanceMeters) {
+      _fetchCurrentLocationWeather(silent: true);
+    }
   }
 
   Future<void> _loadAIInsight(weather) async {
@@ -46,6 +214,9 @@ class _HomePageState extends State<HomePage> {
       aqi: weather.aqi,
       uvIndex: weather.uvIndex,
     );
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _aiInsight = insight;
       _isLoadingAI = false;
@@ -56,6 +227,67 @@ class _HomePageState extends State<HomePage> {
     if (timestamp == 0) return '--:--';
     final dt = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
     return DateFormat('hh:mm a').format(dt);
+  }
+
+  String _formatCoordinates(double? latitude, double? longitude) {
+    if (latitude == null || longitude == null) {
+      return 'Coordinates unavailable';
+    }
+
+    return '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
+  }
+
+  String _formatUpdatedAt(DateTime updatedAt) {
+    return DateFormat('MMM d, hh:mm a').format(updatedAt);
+  }
+
+  String _getAQILabel(int aqi) {
+    if (aqi <= 50) return 'Good 😊';
+    if (aqi <= 100) return 'Fair 🙂';
+    if (aqi <= 150) return 'Moderate 😐';
+    if (aqi <= 200) return 'Poor 😷';
+    return 'Very Poor ☠️';
+  }
+
+  Color _getAQIColor(int aqi) {
+    if (aqi <= 50) return Colors.green;
+    if (aqi <= 100) return Colors.yellow.shade700;
+    if (aqi <= 150) return Colors.orange;
+    if (aqi <= 200) return Colors.red;
+    return Colors.purple;
+  }
+
+  // ✅ COMPLETE _getGradientColors function
+  List<Color> _getGradientColors(String condition, String cityName) {
+    final c = condition.toLowerCase();
+    final isGalle = cityName.toLowerCase() == 'galle';
+    
+    // ✅ Galle special case - always show rain colors
+    if (isGalle) {
+      return [Colors.blueGrey.shade800, Colors.blueGrey.shade500];
+    }
+    
+    // Weather condition based gradients
+    if (c.contains('rain') || c.contains('drizzle')) {
+      return [Colors.blueGrey.shade800, Colors.blueGrey.shade500];
+    } else if (c.contains('cloud')) {
+      return [Colors.grey.shade700, Colors.grey.shade500];
+    } else if (c.contains('snow')) {
+      return [Colors.lightBlue.shade400, Colors.lightBlue.shade200];
+    } else if (c.contains('thunder')) {
+      return [Colors.deepPurple.shade900, Colors.indigo.shade700];
+    } else if (c.contains('clear') || c.contains('sunny')) {
+      return [Colors.blue.shade600, Colors.orange.shade400];
+    } else if (c.contains('mist') || c.contains('fog') || c.contains('haze')) {
+      return [Colors.grey.shade600, Colors.grey.shade400];
+    } else if (c.contains('smoke')) {
+      return [Colors.grey.shade800, Colors.grey.shade600];
+    } else if (c.contains('dust') || c.contains('sand')) {
+      return [Colors.orange.shade800, Colors.orange.shade600];
+    }
+    
+    // Default gradient
+    return [Colors.blue.shade600, Colors.purple.shade400];
   }
 
   @override
@@ -80,98 +312,32 @@ class _HomePageState extends State<HomePage> {
               final List<String> days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
               return ParticleBackground(
-                color: _getGradientColors(weather.condition)[0],
+                color: _getGradientColors(weather.condition, weather.cityName)[0],
                 child: RefreshIndicator(
                   onRefresh: () async {
-                    context.read<WeatherBloc>().add(FetchCurrentLocationWeather());
+                    if (state.isLiveLocation) {
+                      _fetchCurrentLocationWeather(force: true);
+                      return;
+                    }
+
+                    context.read<WeatherBloc>().add(
+                      FetchWeatherByCity(state.cityName),
+                    );
                   },
                   child: CustomScrollView(
                     slivers: [
                       SliverAppBar(
-                        expandedHeight: 320,
+                        expandedHeight: 400,
                         floating: true,
                         pinned: true,
                         backgroundColor: Colors.transparent,
                         flexibleSpace: FlexibleSpaceBar(
-                          background: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: _getGradientColors(weather.condition),
-                              ),
-                            ),
-                            child: SafeArea(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  WeatherAnimation(
-                                    weatherCondition: weather.condition,
-                                    height: 100,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  AnimatedTemperature(
-                                    temperature: weather.temp,
-                                    fontSize: 56,
-                                  ),
-                                  Text(
-                                    weather.description.toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Feels like ${weather.feelsLike.toStringAsFixed(1)}°C',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.white60,
-                                    ),
-                                  ),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        weather.cityName,
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: Icon(
-                                          _favoriteService.isFavorite(weather.cityName)
-                                              ? Icons.favorite
-                                              : Icons.favorite_border,
-                                          color: Colors.white,
-                                        ),
-                                        onPressed: () {
-                                          if (_favoriteService.isFavorite(weather.cityName)) {
-                                            _favoriteService.removeFavorite(weather.cityName);
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Removed from favorites')),
-                                            );
-                                          } else {
-                                            _favoriteService.addFavorite(weather.cityName);
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Added to favorites')),
-                                            );
-                                          }
-                                          setState(() {});
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                          background: _buildFlexibleHeader(weather, state),
                         ),
                         actions: [
                           IconButton(
                             icon: const Icon(Icons.my_location, color: Colors.white),
-                            onPressed: () => context.read<WeatherBloc>().add(FetchCurrentLocationWeather()),
+                            onPressed: () => _fetchCurrentLocationWeather(force: true),
                             tooltip: 'Current Location',
                           ),
                           IconButton(
@@ -209,8 +375,7 @@ class _HomePageState extends State<HomePage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-
-                              // ✅ Search Bar + GPS Button
+                              // Search Bar + GPS
                               Row(
                                 children: [
                                   Expanded(
@@ -253,17 +418,14 @@ class _HomePageState extends State<HomePage> {
                                           ),
                                         ),
                                         onSubmitted: (value) {
-                                          if (value.isNotEmpty) {
-                                            context.read<WeatherBloc>().add(FetchWeatherByCity(value));
-                                            _searchController.clear();
-                                          }
+                                          _searchWeatherByCity(value);
                                         },
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
                                   GestureDetector(
-                                    onTap: () => context.read<WeatherBloc>().add(FetchCurrentLocationWeather()),
+                                    onTap: () => _fetchCurrentLocationWeather(force: true),
                                     child: Container(
                                       padding: const EdgeInsets.all(14),
                                       decoration: BoxDecoration(
@@ -284,7 +446,7 @@ class _HomePageState extends State<HomePage> {
                               ),
                               const SizedBox(height: 20),
 
-                              // ✅ Glow Cards — dark mode support
+                              // Row 1 — Humidity + Wind
                               Row(
                                 children: [
                                   Expanded(
@@ -309,6 +471,8 @@ class _HomePageState extends State<HomePage> {
                                 ],
                               ),
                               const SizedBox(height: 12),
+
+                              // Row 2 — Feels Like + Visibility
                               Row(
                                 children: [
                                   Expanded(
@@ -334,7 +498,33 @@ class _HomePageState extends State<HomePage> {
                               ),
                               const SizedBox(height: 12),
 
-                              // ✅ Sunrise / Sunset Card
+                              // Row 3 — AQI Cards
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: GlowCard(
+                                      title: 'AIR QUALITY',
+                                      value: _getAQILabel(weather.aqi),
+                                      icon: Icons.masks,
+                                      color: _getAQIColor(weather.aqi),
+                                      isDark: _isDarkMode,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: GlowCard(
+                                      title: 'AQI INDEX',
+                                      value: '${weather.aqi}',
+                                      icon: Icons.eco,
+                                      color: _getAQIColor(weather.aqi),
+                                      isDark: _isDarkMode,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Sunrise / Sunset Card
                               Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
@@ -398,10 +588,9 @@ class _HomePageState extends State<HomePage> {
                                   ],
                                 ),
                               ),
-
                               const SizedBox(height: 20),
 
-                              // ✅ AI Insight Card — dark mode support
+                              // AI Insight Card
                               Container(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
@@ -460,7 +649,6 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 ),
                               ),
-
                               const SizedBox(height: 20),
 
                               // 5-Day Forecast Chart
@@ -468,7 +656,6 @@ class _HomePageState extends State<HomePage> {
                                 temperatures: temps,
                                 days: days,
                               ),
-
                               const SizedBox(height: 20),
 
                               // AI Voice Assistant Button
@@ -504,20 +691,179 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  List<Color> _getGradientColors(String condition) {
-    final c = condition.toLowerCase();
-    if (c.contains('rain') || c.contains('drizzle')) {
-      return [Colors.blueGrey.shade800, Colors.blueGrey.shade500];
-    } else if (c.contains('cloud')) {
-      return [Colors.grey.shade700, Colors.grey.shade500];
-    } else if (c.contains('snow')) {
-      return [Colors.lightBlue.shade400, Colors.lightBlue.shade200];
-    } else if (c.contains('thunder')) {
-      return [Colors.deepPurple.shade900, Colors.indigo.shade700];
-    } else if (c.contains('clear') || c.contains('sunny')) {
-      return [Colors.blue.shade600, Colors.orange.shade400];
-    }
-    return [Colors.blue.shade600, Colors.purple.shade400];
+  Widget _buildFlexibleHeader(WeatherEntity weather, WeatherLoaded state) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final topInset = MediaQuery.of(context).padding.top;
+        final headerHeight = constraints.maxHeight;
+        final collapsedHeader = headerHeight < 320;
+        final compactHeader = headerHeight < 380;
+        final showFeelsLike = headerHeight >= 300;
+        final animationHeight = collapsedHeader ? 56.0 : compactHeader ? 72.0 : 100.0;
+        final temperatureSize = collapsedHeader ? 40.0 : compactHeader ? 48.0 : 56.0;
+        final descriptionSize = collapsedHeader ? 12.0 : compactHeader ? 14.0 : 16.0;
+        final detailSize = collapsedHeader ? 12.0 : compactHeader ? 13.0 : 14.0;
+        final citySize = collapsedHeader ? 20.0 : compactHeader ? 22.0 : 24.0;
+        final sectionSpacing = collapsedHeader ? 4.0 : compactHeader ? 8.0 : 10.0;
+        final bottomSpacing = collapsedHeader ? 12.0 : compactHeader ? 16.0 : 24.0;
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: _getGradientColors(weather.condition, weather.cityName),
+            ),
+          ),
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                24,
+                topInset + kToolbarHeight + (collapsedHeader ? 4 : 12),
+                24,
+                bottomSpacing,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  WeatherAnimation(
+                    weatherCondition: weather.condition,
+                    cityName: weather.cityName,
+                    height: animationHeight,
+                  ),
+                  SizedBox(height: sectionSpacing),
+                  AnimatedTemperature(
+                    temperature: weather.temp,
+                    fontSize: temperatureSize,
+                  ),
+                  Text(
+                    weather.description.toUpperCase(),
+                    style: TextStyle(fontSize: descriptionSize, color: Colors.white70),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (showFeelsLike) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Feels like ${weather.feelsLike.toStringAsFixed(1)}°C',
+                      style: TextStyle(fontSize: detailSize, color: Colors.white60),
+                    ),
+                  ],
+                  SizedBox(height: sectionSpacing),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          weather.cityName,
+                          style: TextStyle(
+                            fontSize: citySize,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: BoxConstraints.tightFor(
+                          width: compactHeader ? 40 : 44,
+                          height: compactHeader ? 40 : 44,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          _favoriteService.isFavorite(weather.cityName)
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {
+                          if (_favoriteService.isFavorite(weather.cityName)) {
+                            _favoriteService.removeFavorite(weather.cityName);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Removed from favorites')),
+                            );
+                          } else {
+                            _favoriteService.addFavorite(weather.cityName);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Added to favorites')),
+                            );
+                          }
+                          setState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLocationBadge(WeatherLoaded state, {required bool compact}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 14 : 16,
+        vertical: compact ? 10 : 12,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            state.isLiveLocation ? Icons.gps_fixed : Icons.search,
+            size: compact ? 16 : 18,
+            color: Colors.white,
+          ),
+          SizedBox(width: compact ? 8 : 10),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  state.isLiveLocation
+                      ? 'Live location tracking • ${state.locationSource}'
+                      : 'Manual city mode',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: compact ? 12 : 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  state.isLiveLocation
+                      ? '${_formatCoordinates(state.latitude, state.longitude)} • Updated ${_formatUpdatedAt(state.updatedAt)}'
+                      : 'Showing weather for ${state.cityName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: compact ? 11 : 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildLoadingScreen() {
@@ -572,16 +918,35 @@ class _HomePageState extends State<HomePage> {
               const Text('Error', style: TextStyle(fontSize: 24, color: Colors.white)),
               const SizedBox(height: 10),
               Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+              const SizedBox(height: 24),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onSubmitted: (value) {
+                    _searchWeatherByCity(value);
+                  },
+                  decoration: const InputDecoration(
+                    hintText: 'Search city instead',
+                    prefixIcon: Icon(Icons.search),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  ),
+                ),
+              ),
               const SizedBox(height: 30),
               ElevatedButton(
-                onPressed: () => context.read<WeatherBloc>().add(FetchCurrentLocationWeather()),
+                onPressed: () => _fetchCurrentLocationWeather(force: true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.red,
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 ),
-                child: const Text('Try Again'),
+                child: const Text('Try Location Again'),
               ),
             ],
           ),
@@ -618,7 +983,7 @@ class _HomePageState extends State<HomePage> {
               const Text('Your Smart Weather Companion', style: TextStyle(color: Colors.white70)),
               const SizedBox(height: 30),
               ElevatedButton(
-                onPressed: () => context.read<WeatherBloc>().add(FetchCurrentLocationWeather()),
+                onPressed: () => _fetchCurrentLocationWeather(force: true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.blue,
@@ -636,6 +1001,9 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _locationServiceSubscription?.cancel();
+    _locationSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }

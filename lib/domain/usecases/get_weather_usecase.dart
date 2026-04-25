@@ -21,14 +21,3 @@ class GetWeatherUseCase {
     }
   }
 }
-
-class GetForecastUseCase {
-  final WeatherRepository repository;
-  
-  GetForecastUseCase(this.repository);
-  
-
-  Future<Either<String, List<WeatherEntity>>> execute(double lat, double lon) {
-    return repository.getForecast(lat, lon);
-  }
-}

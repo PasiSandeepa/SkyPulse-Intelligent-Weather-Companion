@@ -34,6 +34,43 @@ class WeatherEntity extends Equatable {
     this.sunrise = 0,
     this.sunset = 0,
   });
+  
+  // ✅ CopyWith method - AQI එක update කරන්න
+  WeatherEntity copyWith({
+    String? cityName,
+    double? temp,
+    double? feelsLike,
+    double? tempMin,
+    double? tempMax,
+    int? humidity,
+    double? windSpeed,
+    String? condition,
+    String? description,
+    String? iconCode,
+    int? aqi,
+    double? uvIndex,
+    double? visibility,
+    int? sunrise,
+    int? sunset,
+  }) {
+    return WeatherEntity(
+      cityName: cityName ?? this.cityName,
+      temp: temp ?? this.temp,
+      feelsLike: feelsLike ?? this.feelsLike,
+      tempMin: tempMin ?? this.tempMin,
+      tempMax: tempMax ?? this.tempMax,
+      humidity: humidity ?? this.humidity,
+      windSpeed: windSpeed ?? this.windSpeed,
+      condition: condition ?? this.condition,
+      description: description ?? this.description,
+      iconCode: iconCode ?? this.iconCode,
+      aqi: aqi ?? this.aqi,
+      uvIndex: uvIndex ?? this.uvIndex,
+      visibility: visibility ?? this.visibility,
+      sunrise: sunrise ?? this.sunrise,
+      sunset: sunset ?? this.sunset,
+    );
+  }
 
   @override
   List<Object?> get props => [

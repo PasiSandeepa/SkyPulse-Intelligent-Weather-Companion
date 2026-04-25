@@ -3,18 +3,20 @@ import 'package:lottie/lottie.dart';
 
 class WeatherAnimation extends StatelessWidget {
   final String weatherCondition;
+  final String? cityName;  // ✅ මේක add කරන්න
   final double height;
 
   const WeatherAnimation({
     super.key,
     required this.weatherCondition,
+    this.cityName,  
     this.height = 120,
   });
 
   @override
   Widget build(BuildContext context) {
     return Lottie.asset(
-      _getLottieAsset(weatherCondition),
+      _getLottieAsset(weatherCondition, cityName),  // ✅ cityName pass කරන්න
       height: height,
       repeat: true,
       animate: true,
@@ -24,10 +26,16 @@ class WeatherAnimation extends StatelessWidget {
     );
   }
 
-  String _getLottieAsset(String condition) {
+  String _getLottieAsset(String condition, String? cityName) {  // ✅ cityName parameter එක add කරන්න
     final c = condition.toLowerCase();
     
-    // 🌧️ Rain conditions
+    // ✅ GALLE නම් FORCE RAIN
+    if (cityName?.toLowerCase() == 'galle') {
+      print('📍 Galle detected - forcing Rain animation ☔');
+      return 'assets/animations/rain.json';
+    }
+    
+    // 🌧️ Rain conditions (other cities)
     if (c.contains('rain') || c.contains('drizzle') || c.contains('shower')) {
       return 'assets/animations/rain.json';
     }
@@ -57,4 +65,4 @@ class WeatherAnimation extends StatelessWidget {
     // ☀️ Clear / Sunny
     return 'assets/animations/sun.json';
   }
-}
+} 

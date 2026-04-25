@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hive_flutter/hive_flutter.dart';  // ✅ මෙය add කරන්න
+import 'package:hive_flutter/hive_flutter.dart';  
 import 'core/api/weather_api.dart';
+import 'core/services/ip_location_service.dart';
 import 'data/repositories/weather_repository_impl.dart';
 import 'domain/usecases/get_weather_usecase.dart';
+import 'domain/usecases/get_forecast_usecase.dart';
 import 'presentation/bloc/weather_bloc.dart';
-import 'presentation/bloc/weather_event.dart';
 import 'presentation/pages/home_page.dart';
 
 void main() async {
@@ -18,10 +19,10 @@ void main() async {
   // ✅ Initialize Hive
   await Hive.initFlutter();
   
-  // ✅ Open required boxes (ඔයාගේ box names දාන්න)
-  await Hive.openBox('settings');   // settings box එක
-  await Hive.openBox('cache');       // cache box එක
-  await Hive.openBox('weather_cache'); // weather cache box එක (තියෙනවා නම්)
+  
+  await Hive.openBox('settings');   
+  await Hive.openBox('cache');       
+  await Hive.openBox('weather_cache');
   
   runApp(const SkyPulseApp());
 }
@@ -32,6 +33,7 @@ class SkyPulseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final weatherApi = WeatherApi();
+    final ipLocationService = IpLocationService();
     final weatherRepository = WeatherRepositoryImpl(weatherApi);
     final getWeatherUseCase = GetWeatherUseCase(weatherRepository);
     final getForecastUseCase = GetForecastUseCase(weatherRepository);
@@ -40,7 +42,8 @@ class SkyPulseApp extends StatelessWidget {
       create: (context) => WeatherBloc(
         getWeatherUseCase: getWeatherUseCase,
         getForecastUseCase: getForecastUseCase,
-      )..add(FetchCurrentLocationWeather()),
+        ipLocationService: ipLocationService,
+      ),
       child: MaterialApp(
         title: 'SkyPulse - AI Weather',
         debugShowCheckedModeBanner: false,
