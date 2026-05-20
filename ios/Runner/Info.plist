@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>SkyPulse uses your current location to automatically detect local weather and air quality.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>SkyPulse uses your location while the app is active so weather updates stay aligned with where you are.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

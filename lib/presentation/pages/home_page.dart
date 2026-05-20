@@ -20,6 +20,7 @@ import '../../core/ai/ai_service.dart';
 import '../../core/services/location_service.dart';
 import '../../domain/entities/weather_entity.dart';
 import '../widgets/voice_assistant_dialog.dart';
+import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -60,7 +61,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && mounted && _followDeviceLocation) {
+    if (state == AppLifecycleState.resumed &&
+        mounted &&
+        _followDeviceLocation) {
       _fetchCurrentLocationWeather(silent: true);
     }
 
@@ -114,7 +117,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
 
     _lastLocationRefreshAt = now;
-    context.read<WeatherBloc>().add(FetchCurrentLocationWeather(silent: silent));
+    context
+        .read<WeatherBloc>()
+        .add(FetchCurrentLocationWeather(silent: silent));
   }
 
   Future<bool> _ensureLocationTrackingReady() async {
@@ -257,17 +262,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Colors.purple;
   }
 
-  // ✅ COMPLETE _getGradientColors function
-  List<Color> _getGradientColors(String condition, String cityName) {
+  List<Color> _getGradientColors(String condition) {
     final c = condition.toLowerCase();
-    final isGalle = cityName.toLowerCase() == 'galle';
-    
-    // ✅ Galle special case - always show rain colors
-    if (isGalle) {
-      return [Colors.blueGrey.shade800, Colors.blueGrey.shade500];
-    }
-    
-    // Weather condition based gradients
+
     if (c.contains('rain') || c.contains('drizzle')) {
       return [Colors.blueGrey.shade800, Colors.blueGrey.shade500];
     } else if (c.contains('cloud')) {
@@ -285,8 +282,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } else if (c.contains('dust') || c.contains('sand')) {
       return [Colors.orange.shade800, Colors.orange.shade600];
     }
-    
-    // Default gradient
+
     return [Colors.blue.shade600, Colors.purple.shade400];
   }
 
@@ -312,7 +308,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               final List<String> days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
               return ParticleBackground(
-                color: _getGradientColors(weather.condition, weather.cityName)[0],
+                color: _getGradientColors(weather.condition)[0],
                 child: RefreshIndicator(
                   onRefresh: () async {
                     if (state.isLiveLocation) {
@@ -321,8 +317,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     }
 
                     context.read<WeatherBloc>().add(
-                      FetchWeatherByCity(state.cityName),
-                    );
+                          FetchWeatherByCity(state.cityName),
+                        );
                   },
                   child: CustomScrollView(
                     slivers: [
@@ -336,8 +332,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ),
                         actions: [
                           IconButton(
-                            icon: const Icon(Icons.my_location, color: Colors.white),
-                            onPressed: () => _fetchCurrentLocationWeather(force: true),
+                            icon: const Icon(Icons.my_location,
+                                color: Colors.white),
+                            onPressed: () =>
+                                _fetchCurrentLocationWeather(force: true),
                             tooltip: 'Current Location',
                           ),
                           IconButton(
@@ -345,12 +343,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               _isDarkMode ? Icons.light_mode : Icons.dark_mode,
                               color: Colors.white,
                             ),
-                            onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+                            onPressed: () =>
+                                setState(() => _isDarkMode = !_isDarkMode),
                             tooltip: 'Toggle Theme',
                           ),
                           IconButton(
                             icon: const Icon(Icons.mic, color: Colors.white),
-                            onPressed: () => showVoiceAssistant(context, weather),
+                            onPressed: () =>
+                                showVoiceAssistant(context, weather),
                             tooltip: 'Voice Assistant',
                           ),
                           IconButton(
@@ -366,22 +366,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               );
                             },
                           ),
+                          IconButton(
+                            icon: const Icon(Icons.person, color: Colors.white),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProfilePage(
+                                    isDarkMode: _isDarkMode,
+                                    onDarkModeChanged: (value) {
+                                      setState(() => _isDarkMode = value);
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                            tooltip: 'Profile',
+                          ),
                         ],
                       ),
-
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Search Bar + GPS
                               Row(
                                 children: [
                                   Expanded(
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: _isDarkMode ? Colors.grey.shade800 : Colors.white,
+                                        color: _isDarkMode
+                                            ? Colors.grey.shade800
+                                            : Colors.white,
                                         borderRadius: BorderRadius.circular(30),
                                         boxShadow: [
                                           BoxShadow(
@@ -394,15 +411,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                       child: TextField(
                                         controller: _searchController,
                                         style: TextStyle(
-                                          color: _isDarkMode ? Colors.white : Colors.black,
+                                          color: _isDarkMode
+                                              ? Colors.white
+                                              : Colors.black,
                                         ),
                                         decoration: InputDecoration(
                                           hintText: '🔍 Search city...',
                                           hintStyle: TextStyle(
-                                            color: _isDarkMode ? Colors.white54 : Colors.grey.shade400,
+                                            color: _isDarkMode
+                                                ? Colors.white54
+                                                : Colors.grey.shade400,
                                           ),
-                                          prefixIcon: const Icon(Icons.search, color: Colors.blue),
-                                          suffixIcon: _searchController.text.isNotEmpty
+                                          prefixIcon: const Icon(Icons.search,
+                                              color: Colors.blue),
+                                          suffixIcon: _searchController
+                                                  .text.isNotEmpty
                                               ? IconButton(
                                                   icon: const Icon(Icons.clear),
                                                   onPressed: () {
@@ -412,7 +435,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                                 )
                                               : null,
                                           border: InputBorder.none,
-                                          contentPadding: const EdgeInsets.symmetric(
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
                                             horizontal: 20,
                                             vertical: 15,
                                           ),
@@ -425,7 +449,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   ),
                                   const SizedBox(width: 10),
                                   GestureDetector(
-                                    onTap: () => _fetchCurrentLocationWeather(force: true),
+                                    onTap: () => _fetchCurrentLocationWeather(
+                                        force: true),
                                     child: Container(
                                       padding: const EdgeInsets.all(14),
                                       decoration: BoxDecoration(
@@ -439,14 +464,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                           ),
                                         ],
                                       ),
-                                      child: const Icon(Icons.my_location, color: Colors.white),
+                                      child: const Icon(Icons.my_location,
+                                          color: Colors.white),
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 20),
-
-                              // Row 1 — Humidity + Wind
                               Row(
                                 children: [
                                   Expanded(
@@ -462,7 +486,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   Expanded(
                                     child: GlowCard(
                                       title: 'WIND',
-                                      value: '${weather.windSpeed.toStringAsFixed(1)} km/h',
+                                      value:
+                                          '${weather.windSpeed.toStringAsFixed(1)} km/h',
                                       icon: Icons.air,
                                       color: Colors.green,
                                       isDark: _isDarkMode,
@@ -471,14 +496,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 ],
                               ),
                               const SizedBox(height: 12),
-
-                              // Row 2 — Feels Like + Visibility
                               Row(
                                 children: [
                                   Expanded(
                                     child: GlowCard(
                                       title: 'FEELS LIKE',
-                                      value: '${weather.feelsLike.toStringAsFixed(1)}°C',
+                                      value:
+                                          '${weather.feelsLike.toStringAsFixed(1)}°C',
                                       icon: Icons.thermostat,
                                       color: Colors.orange,
                                       isDark: _isDarkMode,
@@ -488,7 +512,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   Expanded(
                                     child: GlowCard(
                                       title: 'VISIBILITY',
-                                      value: '${weather.visibility.toStringAsFixed(1)} km',
+                                      value:
+                                          '${weather.visibility.toStringAsFixed(1)} km',
                                       icon: Icons.visibility,
                                       color: Colors.teal,
                                       isDark: _isDarkMode,
@@ -497,8 +522,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 ],
                               ),
                               const SizedBox(height: 12),
-
-                              // Row 3 — AQI Cards
                               Row(
                                 children: [
                                   Expanded(
@@ -523,26 +546,32 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 ],
                               ),
                               const SizedBox(height: 12),
-
-                              // Sunrise / Sunset Card
                               Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
-                                    colors: [Colors.orange.shade300, Colors.pink.shade200],
+                                    colors: [
+                                      Colors.orange.shade300,
+                                      Colors.pink.shade200
+                                    ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceAround,
                                   children: [
                                     Column(
                                       children: [
-                                        const Icon(Icons.wb_twilight, color: Colors.white, size: 32),
+                                        const Icon(Icons.wb_twilight,
+                                            color: Colors.white, size: 32),
                                         const SizedBox(height: 8),
-                                        const Text('Sunrise', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                        const Text('Sunrise',
+                                            style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12)),
                                         Text(
                                           _formatTime(weather.sunrise),
                                           style: const TextStyle(
@@ -553,12 +582,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                         ),
                                       ],
                                     ),
-                                    Container(height: 50, width: 1, color: Colors.white30),
+                                    Container(
+                                        height: 50,
+                                        width: 1,
+                                        color: Colors.white30),
                                     Column(
                                       children: [
-                                        const Icon(Icons.nights_stay, color: Colors.white, size: 32),
+                                        const Icon(Icons.nights_stay,
+                                            color: Colors.white, size: 32),
                                         const SizedBox(height: 8),
-                                        const Text('Sunset', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                        const Text('Sunset',
+                                            style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12)),
                                         Text(
                                           _formatTime(weather.sunset),
                                           style: const TextStyle(
@@ -569,12 +605,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                         ),
                                       ],
                                     ),
-                                    Container(height: 50, width: 1, color: Colors.white30),
+                                    Container(
+                                        height: 50,
+                                        width: 1,
+                                        color: Colors.white30),
                                     Column(
                                       children: [
-                                        const Icon(Icons.show_chart, color: Colors.white, size: 32),
+                                        const Icon(Icons.show_chart,
+                                            color: Colors.white, size: 32),
                                         const SizedBox(height: 8),
-                                        const Text('Min/Max', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                        const Text('Min/Max',
+                                            style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12)),
                                         Text(
                                           '${weather.tempMin.toStringAsFixed(0)}°/${weather.tempMax.toStringAsFixed(0)}°',
                                           style: const TextStyle(
@@ -589,14 +632,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 ),
                               ),
                               const SizedBox(height: 20),
-
-                              // AI Insight Card
                               Container(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: _isDarkMode
-                                        ? [Colors.purple.shade900, Colors.blue.shade900]
-                                        : [Colors.purple.shade50, Colors.blue.shade50],
+                                        ? [
+                                            Colors.purple.shade900,
+                                            Colors.blue.shade900
+                                          ]
+                                        : [
+                                            Colors.purple.shade50,
+                                            Colors.blue.shade50
+                                          ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
@@ -605,7 +652,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -613,9 +661,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                             padding: const EdgeInsets.all(8),
                                             decoration: BoxDecoration(
                                               color: Colors.purple.shade100,
-                                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
-                                            child: Icon(Icons.auto_awesome, color: Colors.purple.shade700),
+                                            child: Icon(Icons.auto_awesome,
+                                                color: Colors.purple.shade700),
                                           ),
                                           const SizedBox(width: 12),
                                           Text(
@@ -623,7 +673,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
-                                              color: _isDarkMode ? Colors.white : Colors.black,
+                                              color: _isDarkMode
+                                                  ? Colors.white
+                                                  : Colors.black,
                                             ),
                                           ),
                                         ],
@@ -638,11 +690,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                         )
                                       else
                                         Text(
-                                          _aiInsight.isEmpty ? 'Loading AI insights...' : _aiInsight,
+                                          _aiInsight.isEmpty
+                                              ? 'Loading AI insights...'
+                                              : _aiInsight,
                                           style: TextStyle(
                                             fontSize: 14,
                                             height: 1.5,
-                                            color: _isDarkMode ? Colors.white70 : Colors.black87,
+                                            color: _isDarkMode
+                                                ? Colors.white70
+                                                : Colors.black87,
                                           ),
                                         ),
                                     ],
@@ -650,24 +706,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 ),
                               ),
                               const SizedBox(height: 20),
-
-                              // 5-Day Forecast Chart
                               ForecastChart(
                                 temperatures: temps,
                                 days: days,
                               ),
                               const SizedBox(height: 20),
-
-                              // AI Voice Assistant Button
                               Center(
                                 child: ElevatedButton.icon(
-                                  onPressed: () => showVoiceAssistant(context, weather),
+                                  onPressed: () =>
+                                      showVoiceAssistant(context, weather),
                                   icon: const Icon(Icons.mic),
                                   label: const Text('Ask AI Weather Assistant'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.purple.shade600,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 30, vertical: 14),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(30),
                                     ),
@@ -699,20 +753,48 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final collapsedHeader = headerHeight < 320;
         final compactHeader = headerHeight < 380;
         final showFeelsLike = headerHeight >= 300;
-        final animationHeight = collapsedHeader ? 56.0 : compactHeader ? 72.0 : 100.0;
-        final temperatureSize = collapsedHeader ? 40.0 : compactHeader ? 48.0 : 56.0;
-        final descriptionSize = collapsedHeader ? 12.0 : compactHeader ? 14.0 : 16.0;
-        final detailSize = collapsedHeader ? 12.0 : compactHeader ? 13.0 : 14.0;
-        final citySize = collapsedHeader ? 20.0 : compactHeader ? 22.0 : 24.0;
-        final sectionSpacing = collapsedHeader ? 4.0 : compactHeader ? 8.0 : 10.0;
-        final bottomSpacing = collapsedHeader ? 12.0 : compactHeader ? 16.0 : 24.0;
+        final animationHeight = collapsedHeader
+            ? 56.0
+            : compactHeader
+                ? 72.0
+                : 100.0;
+        final temperatureSize = collapsedHeader
+            ? 40.0
+            : compactHeader
+                ? 48.0
+                : 56.0;
+        final descriptionSize = collapsedHeader
+            ? 12.0
+            : compactHeader
+                ? 14.0
+                : 16.0;
+        final detailSize = collapsedHeader
+            ? 12.0
+            : compactHeader
+                ? 13.0
+                : 14.0;
+        final citySize = collapsedHeader
+            ? 20.0
+            : compactHeader
+                ? 22.0
+                : 24.0;
+        final sectionSpacing = collapsedHeader
+            ? 4.0
+            : compactHeader
+                ? 8.0
+                : 10.0;
+        final bottomSpacing = collapsedHeader
+            ? 12.0
+            : compactHeader
+                ? 16.0
+                : 24.0;
 
         return Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: _getGradientColors(weather.condition, weather.cityName),
+              colors: _getGradientColors(weather.condition),
             ),
           ),
           child: SingleChildScrollView(
@@ -729,7 +811,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 children: [
                   WeatherAnimation(
                     weatherCondition: weather.condition,
-                    cityName: weather.cityName,
                     height: animationHeight,
                   ),
                   SizedBox(height: sectionSpacing),
@@ -739,7 +820,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                   Text(
                     weather.description.toUpperCase(),
-                    style: TextStyle(fontSize: descriptionSize, color: Colors.white70),
+                    style: TextStyle(
+                        fontSize: descriptionSize, color: Colors.white70),
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -748,7 +830,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     const SizedBox(height: 4),
                     Text(
                       'Feels like ${weather.feelsLike.toStringAsFixed(1)}°C',
-                      style: TextStyle(fontSize: detailSize, color: Colors.white60),
+                      style: TextStyle(
+                          fontSize: detailSize, color: Colors.white60),
                     ),
                   ],
                   SizedBox(height: sectionSpacing),
@@ -784,12 +867,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           if (_favoriteService.isFavorite(weather.cityName)) {
                             _favoriteService.removeFavorite(weather.cityName);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Removed from favorites')),
+                              const SnackBar(
+                                  content: Text('Removed from favorites')),
                             );
                           } else {
                             _favoriteService.addFavorite(weather.cityName);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Added to favorites')),
+                              const SnackBar(
+                                  content: Text('Added to favorites')),
                             );
                           }
                           setState(() {});
@@ -888,10 +973,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               },
             ),
             const SizedBox(height: 20),
-            const Text('🌤️ SkyPulse',
-                style: TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold)),
+            const Text('🌤️ Welcome! Your SkyPulse App',
+                style: TextStyle(
+                    fontSize: 24,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            const Text('Loading weather...', style: TextStyle(color: Colors.white70)),
+            const Text('Loading weather...',
+                style: TextStyle(color: Colors.white70)),
           ],
         ),
       ),
@@ -915,9 +1004,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             children: [
               const Icon(Icons.error_outline, size: 80, color: Colors.white),
               const SizedBox(height: 20),
-              const Text('Error', style: TextStyle(fontSize: 24, color: Colors.white)),
+              const Text('Error',
+                  style: TextStyle(fontSize: 24, color: Colors.white)),
               const SizedBox(height: 10),
-              Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+              Text(message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white70)),
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
@@ -933,7 +1025,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     hintText: 'Search city instead',
                     prefixIcon: Icon(Icons.search),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   ),
                 ),
               ),
@@ -943,8 +1036,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
                 ),
                 child: const Text('Try Location Again'),
               ),
@@ -978,17 +1073,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 20),
               const Text('SkyPulse',
-                  style: TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      fontSize: 32,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
-              const Text('Your Smart Weather Companion', style: TextStyle(color: Colors.white70)),
+              const Text('Your Smart Weather Companion',
+                  style: TextStyle(color: Colors.white70)),
               const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: () => _fetchCurrentLocationWeather(force: true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
                 ),
                 child: const Text('🌍 Get Weather'),
               ),

@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:http/http.dart' as http;
 
 class GeoCoordinates {
@@ -13,7 +12,7 @@ class GeoCoordinates {
 }
 
 class IpLocationService {
-  static const String _endpoint = 'https://api.ipwho.org/me';
+  static const String _endpoint = 'https://api.ipwho.is/';
 
   Future<GeoCoordinates?> getApproximateLocation() async {
     try {
@@ -31,13 +30,10 @@ class IpLocationService {
       }
 
       final success = body['success'] == true;
-      final data = body['data'];
-      if (!success || data is! Map<String, dynamic>) {
-        return null;
-      }
+      if (!success) return null;
 
-      final latitude = (data['latitude'] as num?)?.toDouble();
-      final longitude = (data['longitude'] as num?)?.toDouble();
+      final latitude = (body['latitude'] as num?)?.toDouble();
+      final longitude = (body['longitude'] as num?)?.toDouble();
 
       if (latitude == null || longitude == null) {
         return null;

@@ -1,3 +1,6 @@
+import org.gradle.api.file.Directory
+import org.gradle.api.tasks.Delete
+
 allprojects {
     repositories {
         google()
@@ -22,3 +25,4 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+

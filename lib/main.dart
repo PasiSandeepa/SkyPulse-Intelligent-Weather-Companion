@@ -8,18 +8,16 @@ import 'data/repositories/weather_repository_impl.dart';
 import 'domain/usecases/get_weather_usecase.dart';
 import 'domain/usecases/get_forecast_usecase.dart';
 import 'presentation/bloc/weather_bloc.dart';
+import 'presentation/bloc/auth/auth_bloc.dart';
 import 'presentation/pages/home_page.dart';
+import 'presentation/pages/login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // ✅ Load .env file
   await dotenv.load(fileName: ".env");
   
-  // ✅ Initialize Hive
   await Hive.initFlutter();
-  
-  
   await Hive.openBox('settings');   
   await Hive.openBox('cache');       
   await Hive.openBox('weather_cache');
@@ -38,12 +36,19 @@ class SkyPulseApp extends StatelessWidget {
     final getWeatherUseCase = GetWeatherUseCase(weatherRepository);
     final getForecastUseCase = GetForecastUseCase(weatherRepository);
 
-    return BlocProvider(
-      create: (context) => WeatherBloc(
-        getWeatherUseCase: getWeatherUseCase,
-        getForecastUseCase: getForecastUseCase,
-        ipLocationService: ipLocationService,
-      ),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => AuthBloc()..add(CheckAuthStatus()),
+        ),
+        BlocProvider(
+          create: (context) => WeatherBloc(
+            getWeatherUseCase: getWeatherUseCase,
+            getForecastUseCase: getForecastUseCase,
+            ipLocationService: ipLocationService,
+          ),
+        ),
+      ],
       child: MaterialApp(
         title: 'SkyPulse - AI Weather',
         debugShowCheckedModeBanner: false,
@@ -53,13 +58,23 @@ class SkyPulseApp extends StatelessWidget {
         ),
         darkTheme: ThemeData.dark(),
         themeMode: ThemeMode.system,
-        home: const SplashScreen(),
+        home: BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, state) {
+            if (state.status == AuthStatus.authenticated) {
+              return const HomePage();
+            }
+            // ✅ Fixed - loading state ද cover වෙනවා
+            if (state.status == AuthStatus.initial ||
+                state.status == AuthStatus.loading) {
+              return const SplashScreen();
+            }
+            return const LoginPage();
+          },
+        ),
       ),
     );
   }
 }
-
-// ... SplashScreen එක එහෙමම තියෙන්න ...
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -72,14 +87,6 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomePage()),
-        );
-      }
-    });
   }
 
   @override
