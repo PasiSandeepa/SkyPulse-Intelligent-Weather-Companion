@@ -34,33 +34,24 @@ SkyPulse is an **AI-powered advanced weather application** that provides real-ti
 
 ## 🎨 **Screenshots**
 
-<!-- <div align="center">
+<div align="center">
 
-### Home Screen & Weather Display
+### Splash & Home Screen
+| Splash | Home (Light) | Home (Dark) |
+|:------:|:------------:|:-----------:|
+| <img src="assets/screenshots/Screenshot 2026-05-20 105421.png" width="200"> | <img src="assets/screenshots/Screenshot 2026-05-20 105440.png" width="200"> | <img src="assets/screenshots/Screenshot 2026-05-20 105526.png" width="200"> |
 
-| Weather Details | 5-Day Forecast |
-|:---------------:|:--------------:|
-| <img src="assets/screenshots/home_screen.png" width="250"> | <img src="assets/screenshots/forecast.png" width="250"> |
+### Weather Details & AI Insights
+| Weather Details (Light) | Weather Details (Dark) | AI Forecast |
+|:-----------------------:|:----------------------:|:-----------:|
+| <img src="assets/screenshots/Screenshot 2026-05-20 105538.png" width="200"> | <img src="assets/screenshots/Screenshot 2026-05-20 105549.png" width="200"> | <img src="assets/screenshots/Screenshot 2026-05-20 105617.png" width="200"> |
 
-### AI Voice Assistant & City Search
+### Voice Assistant & Profile
+| Voice (Light) | Voice (Dark) | Profile (Dark) | Profile (Light) |
+|:-------------:|:------------:|:---------------:|:--------------:|
+| <img src="assets/screenshots/Screenshot 2026-05-20 105629.png" width="200"> | <img src="assets/screenshots/Screenshot 2026-05-20 105640.png" width="200"> | <img src="assets/screenshots/Screenshot 2026-05-20 105652.png" width="200"> | <img src="assets/screenshots/Screenshot 2026-05-20 105708.png" width="200"> |
 
-| Voice Assistant | Search Feature |
-|:---------------:|:--------------:|
-| <img src="assets/screenshots/voice_assistant.png" width="250"> | <img src="assets/screenshots/search.png" width="250"> |
-
-### Profile & Settings
-
-| Profile Page | Weather Metrics |
-|:------------:|:---------------:|
-| <img src="assets/screenshots/profile.png" width="250"> | <img src="assets/screenshots/weather_details.png" width="250"> |
-
-### Air Quality & Insights
-
-| AQI Display | AI Insights |
-|:-----------:|:-----------:|
-| <img src="assets/screenshots/aqi.png" width="250"> | <img src="assets/screenshots/ai_insight.png" width="250"> |
-
-</div> -->
+</div>
 
 ---
 
@@ -89,16 +80,18 @@ SkyPulse is an **AI-powered advanced weather application** that provides real-ti
 
 ### Prerequisites
 
-```bash
-Flutter SDK (>=3.0.0)
-Dart SDK (>=3.0.0)
-Android Studio / VS Code
+- Flutter SDK (>=3.0.0)
+- Dart SDK (>=3.0.0)
+- Android Studio / VS Code
 
+### Installation
+
+```bash
 # Clone the repository
-git clone https://github.com/yourusername/skypulse.git
+git clone https://github.com/PasiSandeepa/SkyPulse-Intelligent-Weather-Companion.git
 
 # Navigate to project
-cd skypulse
+cd skypulse_app
 
 # Get dependencies
 flutter pub get
@@ -109,7 +102,11 @@ echo "GEMINI_API_KEY=your_key_here" >> .env
 
 # Run the app
 flutter run
+```
 
+---
+
+## 📁 **Project Structure**
 lib/
 ├── core/
 │   ├── api/              # API services
@@ -123,6 +120,21 @@ lib/
 │   ├── entities/         # Business entities
 │   └── usecases/         # Use cases
 └── presentation/
-    ├── bloc/             # State management
-    ├── pages/            # UI Screens
-    └── widgets/          # Reusable components
+├── bloc/             # State management
+├── pages/            # UI Screens
+└── widgets/          # Reusable components
+
+---
+
+## 📄 **License**
+
+This project is licensed under the MIT License.
+
+---
+
+<div align="center">
+Made with ❤️ by Pasindu Sandeepa
+</div>
+bashgit add README.md
+git commit -m "Fix README structure and duplicate sections"
+git push
