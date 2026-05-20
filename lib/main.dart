@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hive_flutter/hive_flutter.dart';  
+import 'package:hive_flutter/hive_flutter.dart';
 import 'core/api/weather_api.dart';
 import 'core/services/ip_location_service.dart';
+import 'core/services/notification_service.dart'; // ✅ Add
 import 'data/repositories/weather_repository_impl.dart';
 import 'domain/usecases/get_weather_usecase.dart';
 import 'domain/usecases/get_forecast_usecase.dart';
@@ -14,14 +15,17 @@ import 'presentation/pages/login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   await dotenv.load(fileName: ".env");
-  
+
   await Hive.initFlutter();
-  await Hive.openBox('settings');   
-  await Hive.openBox('cache');       
+  await Hive.openBox('settings');
+  await Hive.openBox('cache');
   await Hive.openBox('weather_cache');
-  
+
+  // ✅ Notification service init
+  await NotificationService().init();
+
   runApp(const SkyPulseApp());
 }
 
@@ -63,7 +67,6 @@ class SkyPulseApp extends StatelessWidget {
             if (state.status == AuthStatus.authenticated) {
               return const HomePage();
             }
-            // ✅ Fixed - loading state ද cover වෙනවා
             if (state.status == AuthStatus.initial ||
                 state.status == AuthStatus.loading) {
               return const SplashScreen();
