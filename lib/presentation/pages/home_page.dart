@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as developer;
+
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,7 +17,6 @@ import '../../common/widgets/animated_temperature.dart';
 import '../../common/widgets/particle_background.dart';
 import '../../data/local/favorite_service.dart';
 import '../../core/ai/ai_service.dart';
-import '../../core/services/location_service.dart';
 import '../../core/services/notification_service.dart'; // ✅ Add
 import '../../domain/entities/weather_entity.dart';
 import '../widgets/voice_assistant_dialog.dart';
@@ -37,7 +36,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final FavoriteService _favoriteService = FavoriteService();
   final AIService _aiService = AIService();
-  final LocationService _locationService = LocationService();
   final NotificationService _notificationService = NotificationService(); // ✅ Add
   StreamSubscription<Position>? _locationSubscription;
   StreamSubscription<ServiceStatus>? _locationServiceSubscription;
@@ -102,7 +100,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }) async {
     _followDeviceLocation = true;
     final isTrackingReady = await _ensureLocationTrackingReady();
-    if (!mounted || !isTrackingReady) return;
+    if (!mounted) return;
+
+    if (!isTrackingReady) {
+      await _stopLocationTracking();
+    }
 
     final now = DateTime.now();
     final shouldThrottle = !force &&
@@ -116,14 +118,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<bool> _ensureLocationTrackingReady() async {
-    final hasLocationAccess = await _locationService.ensureLocationAccess();
-    if (!hasLocationAccess) {
-      await _stopLocationTracking();
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
       return false;
     }
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return false;
+    }
+
     if (_locationSubscription == null) {
       _startLocationTracking();
     }
+
     return true;
   }
 
@@ -256,26 +265,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Colors.purple;
   }
 
-  List<Color> _getGradientColors(String condition) {
-    final c = condition.toLowerCase();
+  bool _isSunVisible(WeatherEntity weather) {
+    final iconCode = weather.iconCode.toLowerCase();
+    final c = '${weather.condition} ${weather.description}'.toLowerCase();
+
+    if (iconCode.endsWith('n')) return false;
+    if (iconCode == '01d' || iconCode == '02d') return true;
+
+    return c.contains('clear') ||
+        c.contains('sunny') ||
+        c.contains('mostly sunny') ||
+        c.contains('partly cloudy') ||
+        c.contains('few cloud');
+  }
+
+  List<Color> _getGradientColors(WeatherEntity weather) {
+    if (_isSunVisible(weather)) {
+      return [Colors.blue.shade600, Colors.orange.shade400];
+    }
+
+    final c = '${weather.condition} ${weather.description}'.toLowerCase();
     if (c.contains('rain') || c.contains('drizzle')) {
-      return [Colors.blueGrey.shade800, Colors.blueGrey.shade500];
+      return [Colors.blueGrey.shade900, Colors.blueGrey.shade700];
     } else if (c.contains('cloud')) {
-      return [Colors.grey.shade700, Colors.grey.shade500];
+      return [Colors.grey.shade900, Colors.grey.shade700];
     } else if (c.contains('snow')) {
-      return [Colors.lightBlue.shade400, Colors.lightBlue.shade200];
+      return [Colors.blueGrey.shade800, Colors.lightBlue.shade700];
     } else if (c.contains('thunder')) {
       return [Colors.deepPurple.shade900, Colors.indigo.shade700];
-    } else if (c.contains('clear') || c.contains('sunny')) {
-      return [Colors.blue.shade600, Colors.orange.shade400];
     } else if (c.contains('mist') || c.contains('fog') || c.contains('haze')) {
-      return [Colors.grey.shade600, Colors.grey.shade400];
+      return [Colors.blueGrey.shade900, Colors.grey.shade700];
     } else if (c.contains('smoke')) {
-      return [Colors.grey.shade800, Colors.grey.shade600];
+      return [Colors.grey.shade900, Colors.grey.shade700];
     } else if (c.contains('dust') || c.contains('sand')) {
-      return [Colors.orange.shade800, Colors.orange.shade600];
+      return [Colors.brown.shade900, Colors.orange.shade900];
     }
-    return [Colors.blue.shade600, Colors.purple.shade400];
+    return [const Color(0xFF0F172A), const Color(0xFF1E293B)];
   }
 
   @override
@@ -300,7 +325,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               final List<String> days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
               return ParticleBackground(
-                color: _getGradientColors(weather.condition)[0],
+                color: _getGradientColors(weather)[0],
                 child: RefreshIndicator(
                   onRefresh: () async {
                     if (state.isLiveLocation) {
@@ -679,7 +704,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: _getGradientColors(weather.condition),
+              colors: _getGradientColors(weather),
             ),
           ),
           child: SingleChildScrollView(
@@ -694,7 +719,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  WeatherAnimation(weatherCondition: weather.condition, height: animationHeight),
+                  WeatherAnimation(
+                    weatherCondition: weather.condition,
+                    iconCode: weather.iconCode,
+                    height: animationHeight,
+                  ),
                   SizedBox(height: sectionSpacing),
                   AnimatedTemperature(temperature: weather.temp, fontSize: temperatureSize),
                   Text(
