@@ -187,10 +187,9 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
     }
 
     try {
-      // ✅ Fix - accuracy අඩු කළා, timeout අඩු කළා
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.lowest,
-        timeLimit: const Duration(seconds: 10),
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
       );
       return _ResolvedCoordinates(
         latitude: position.latitude,
