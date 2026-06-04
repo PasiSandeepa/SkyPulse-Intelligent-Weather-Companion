@@ -100,7 +100,7 @@ class _SplashScreenState extends State<SplashScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.blue.shade400, Colors.purple.shade400],
+            colors: [Colors.blue.shade400, const Color.fromARGB(255, 155, 64, 171)],
           ),
         ),
         child: Center(
